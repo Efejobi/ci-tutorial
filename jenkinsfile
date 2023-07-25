@@ -1,0 +1,78 @@
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "M3"
+    }
+
+    stages {
+        stage("Checkout") {
+            steps {
+                git branch: 'main', url: '//https://github.com/Efejobi/ci-tutorial.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('JavaWebApp') {
+                    sh 'mvn clean package'
+                }
+            }
+            post {
+                always {
+                    // Archive the generated artifacts
+                    archiveArtifacts 'JavaWebApp/target/*.jar'
+                }
+            }
+        }
+        stage('Unit Test'){
+            steps {
+                dir('JavaWebApp') {
+                    sh 'mvn test'
+                }
+            }
+        }
+        
+        stage('Integration Test'){
+            steps {
+                dir('JavaWebApp') {
+                    sh 'mvn verify -DskipUnitTests'
+                }
+            }
+        }    
+        
+        stage ('Checkstyle Code Analysis'){
+            steps {
+                dir('JavaWebApp') {
+                    sh 'mvn checkstyle:checkstyle'
+                }
+            }
+            post {
+                success {
+                    echo 'Generated Analysis Result'
+                }
+            }
+        }
+        
+        
+        stage('SonarQube Scan') {
+            steps {
+                dir('JavaWebApp') {
+                    sh """mvn sonar:sonar \
+  -Dsonar.projectKey=JavaWebApp \
+  -Dsonar.host.url=http://54.242.68.99:9000 \
+  -Dsonar.login=e680278ed09cb611d6cf086b49817168d3f0cc53"""
+                }
+            }
+        }
+        
+        stage('Nexus Deploy'){
+            steps {
+                dir('JavaWebApp') {
+                        sh "mvn deploy -s ../settings.xml"
+                }
+            }
+        }
+    }
+}
